@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GameWatchdog"
+rootProject.name = "ReOpenApp"
 include(":app")

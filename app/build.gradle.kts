@@ -11,8 +11,8 @@ android {
         applicationId = "com.gamewatchdog"
         minSdk = 24
         targetSdk = 34
-        versionCode = 5
-        versionName = "1.3.1"
+        versionCode = 10
+        versionName = "1.4.3"
     }
 
     buildTypes {

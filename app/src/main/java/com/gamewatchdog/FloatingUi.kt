@@ -5,6 +5,8 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.MotionEvent
@@ -45,6 +47,10 @@ class FloatingUi(private val svc: WatchdogService) {
     private val recorded = ArrayList<MacroStep>()
     private var lastEnd = 0L
     private var recPkg = ""
+    private val uiHandler = Handler(Looper.getMainLooper())
+
+    /** true trong lúc app đang phát lại thao tác vào game: mọi chạm lên lớp ghi bị bỏ qua, không ghi trùng. */
+    private var replaying = false
 
     var recording = false
         private set
@@ -274,6 +280,7 @@ class FloatingUi(private val svc: WatchdogService) {
             return
         }
         recPkg = t.pkg
+        replaying = false
         recorded.clear()
         lastEnd = SystemClock.uptimeMillis()
 
@@ -293,17 +300,27 @@ class FloatingUi(private val svc: WatchdogService) {
         var downX = 0f
         var downY = 0f
         var downT = 0L
+        var tracking = false
         v.setOnTouchListener { _, e ->
+            if (replaying) return@setOnTouchListener true // đang phát lại: không ghi
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
                     downY = e.rawY
                     downT = SystemClock.uptimeMillis()
+                    tracking = true
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    val upT = SystemClock.uptimeMillis()
-                    onUserGesture(downX, downY, e.rawX, e.rawY, upT - downT, downT, upT)
+                    if (tracking) {
+                        tracking = false
+                        val upT = SystemClock.uptimeMillis()
+                        onUserGesture(downX, downY, e.rawX, e.rawY, upT - downT, downT, upT)
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    tracking = false
                     true
                 }
                 else -> true
@@ -386,28 +403,33 @@ class FloatingUi(private val svc: WatchdogService) {
             )
         )
 
-        // Cho thao tác "xuyên" qua lớp ghi để app vẫn nhận được: tạm thời không chặn chạm rồi phát lại
+        // Cho thao tác "xuyên" qua lớp ghi để app vẫn nhận được:
+        // 1) khoá ghi (replaying), 2) tắt khả năng nhận chạm của lớp ghi,
+        // 3) CHỜ lớp ghi tắt hẳn rồi mới phát lại (tránh cú chạm phát lại rơi vào lớp ghi và bị ghi trùng),
+        // 4) phát lại xong thì bật lại, và chờ thêm một nhịp trước khi mở khoá ghi.
+        replaying = true
+        setLayerTouchable(false)
+        uiHandler.postDelayed({
+            svc.dispatchPx(x1, y1, x2, y2, dur, swipe) {
+                setLayerTouchable(true)
+                uiHandler.postDelayed({ replaying = false }, 150L)
+            }
+        }, 80L)
+    }
+
+    private fun setLayerTouchable(touchable: Boolean) {
         val v = layer
         val lp = layerParams
-        if (v != null && lp != null) {
-            lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-            try {
-                wm.updateViewLayout(v, lp)
-            } catch (e: Exception) {
-                // bỏ qua
-            }
+        if (v == null || lp == null) return
+        lp.flags = if (touchable) {
+            lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        } else {
+            lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         }
-        svc.dispatchPx(x1, y1, x2, y2, dur, swipe) {
-            val v2 = layer
-            val lp2 = layerParams
-            if (v2 != null && lp2 != null) {
-                lp2.flags = lp2.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
-                try {
-                    wm.updateViewLayout(v2, lp2)
-                } catch (e: Exception) {
-                    // bỏ qua
-                }
-            }
+        try {
+            wm.updateViewLayout(v, lp)
+        } catch (e: Exception) {
+            // bỏ qua
         }
     }
 }

@@ -1,4 +1,4 @@
-# Game Watchdog
+# ReOpen App
 
 Ứng dụng Android giám sát nhiều app cùng lúc. Khi một app bị thoát hoặc văng, app tự mở lại đúng app đó, chờ tải xong, rồi chạy macro (chạm/vuốt) riêng của app đó.
 
@@ -10,7 +10,7 @@
 
 ## Cài đặt trên điện thoại
 1. Cài APK (cho phép cài từ nguồn ngoài).
-2. Mở app → **Bật dịch vụ trợ năng** → bật *Game Watchdog*.
+2. Mở app → **Bật dịch vụ trợ năng** → bật *ReOpen App*.
    - Android 13+ nếu nút bị mờ: **Mở thông tin ứng dụng** → ⋮ → *Cho phép cài đặt bị hạn chế*, rồi bật lại.
    - Sau khi cập nhật bản mới: tắt rồi bật lại dịch vụ.
 3. **＋ Thêm app** cho từng app cần giám sát.
@@ -45,7 +45,7 @@ x, y là % màn hình. Dạng cũ `x,y,chờ_ms` vẫn dùng được.
 ## Build APK
 Đẩy code lên GitHub nhánh `main`. Workflow `.github/workflows/build.yml` tự build và đưa `app-debug.apk` vào:
 - **Releases → Bản build mới nhất** (tải thẳng trên điện thoại)
-- hoặc tab **Actions → artifact `GameWatchdog-apk`**
+- hoặc tab **Actions → artifact `ReOpenApp-apk`**
 
 ## Giới hạn
 - Nếu một app bị tự mở lại 3 lần trong 5 phút, giám sát app đó tự tắt và ghi lý do vào nhật ký (thường do không nhận ra app đang chạy).

@@ -65,7 +65,7 @@ class MainActivity : Activity() {
         } catch (e: Exception) {
             "?"
         }
-        root.addView(label("Game Watchdog  v$ver", 24f, true))
+        root.addView(label("ReOpen App  v$ver", 24f, true))
         tvStatus = label("", 15f, false)
         root.addView(tvStatus)
 
