@@ -60,7 +60,12 @@ class MainActivity : Activity() {
         scroll.addView(root)
         setContentView(scroll)
 
-        root.addView(label("Game Watchdog", 24f, true))
+        val ver = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (e: Exception) {
+            "?"
+        }
+        root.addView(label("Game Watchdog  v$ver", 24f, true))
         tvStatus = label("", 15f, false)
         root.addView(tvStatus)
 

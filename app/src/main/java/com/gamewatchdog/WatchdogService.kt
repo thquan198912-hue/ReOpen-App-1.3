@@ -62,7 +62,12 @@ class WatchdogService : AccessibilityService() {
         super.onServiceConnected()
         instance = this
         refreshIme()
-        Prefs.log(this, "Dịch vụ trợ năng đã kết nối")
+        val ver = try {
+            packageManager.getPackageInfo(packageName, 0).versionName
+        } catch (e: Exception) {
+            "?"
+        }
+        Prefs.log(this, "Dịch vụ trợ năng đã kết nối (bản $ver)")
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed(ticker, 2000L)
 
