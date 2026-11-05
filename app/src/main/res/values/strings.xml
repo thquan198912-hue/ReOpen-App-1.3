@@ -1,1 +1,5 @@
-<resources><string name="app_name_desc">Giám sát và mở lại app nhân bản khi bị đóng/văng</string></resources>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ReOpen App</string>
+    <string name="service_desc">Theo dõi các app bạn chọn (kể cả nhiều app cùng lúc trên màn hình). Khi app bị thoát hoặc văng, tự mở lại và chạy macro chạm/vuốt riêng của app đó. Dịch vụ chỉ đọc tên app đang hiển thị, không đọc nội dung.</string>
+</resources>
