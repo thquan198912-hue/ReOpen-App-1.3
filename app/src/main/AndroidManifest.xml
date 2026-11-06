@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Quyền "Truy cập sử dụng" (người dùng tự cấp): để nhận ra app đang hiển thị kể cả app nhân bản -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
     <!-- Cần để liệt kê và mở được game đã cài (Android 11+) -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
     <!-- Cho phép xin tắt tối ưu pin để dịch vụ không bị hệ thống dừng -->

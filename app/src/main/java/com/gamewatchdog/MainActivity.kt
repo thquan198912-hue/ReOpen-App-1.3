@@ -2,6 +2,8 @@ package com.gamewatchdog
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -140,7 +142,38 @@ class MainActivity : Activity() {
 
         root.addView(button("Tắt tối ưu pin (nên làm)") { requestBatteryExemption() })
 
+        root.addView(label("5. Nhận diện app nhân bản (clone)", 16f, true))
+        root.addView(
+            label(
+                "Nên cấp quyền \"Truy cập sử dụng\" cho ReOpen App: hệ thống sẽ báo app nào đang hiển thị, " +
+                    "giúp nhận ra game nhân bản kể cả khi cửa sổ game không đọc được. Tìm ReOpen App trong danh sách rồi bật.",
+                13f, false
+            )
+        )
+        root.addView(button("Cấp quyền \"Truy cập sử dụng\"") {
+            try {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            } catch (e: Exception) {
+                toast("Máy không mở được màn hình này, hãy tìm trong Cài đặt → Quyền riêng tư / Quyền truy cập đặc biệt")
+            }
+        })
+        root.addView(button("Chẩn đoán cửa sổ (mở game rồi bấm)") {
+            val s = WatchdogService.instance
+            if (s == null) {
+                toast("Dịch vụ trợ năng chưa bật")
+            } else {
+                s.dumpDiagnostics()
+                toast("Đã ghi kết quả vào Nhật ký bên dưới")
+            }
+        })
+
         root.addView(label("Nhật ký (mới nhất ở trên)", 16f, true))
+        root.addView(button("Sao chép nhật ký") {
+            val text = Prefs.getLog(this)
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("ReOpen log", text))
+            toast("Đã sao chép nhật ký")
+        })
         tvLog = label("", 12f, false)
         root.addView(tvLog)
     }
@@ -167,11 +200,16 @@ class MainActivity : Activity() {
 
     private fun refreshStatus() {
         val on = WatchdogService.instance != null
-        tvStatus.text = if (on) {
+        val usageOk = UsageTracker(this).hasPermission()
+        tvStatus.text = (if (on) {
             "● Dịch vụ trợ năng: ĐANG CHẠY"
         } else {
             "○ Dịch vụ trợ năng: CHƯA BẬT (bấm nút 1)"
-        }
+        }) + "\n" + (if (usageOk) {
+            "● Truy cập sử dụng: ĐÃ CẤP (nhận diện app nhân bản tốt hơn)"
+        } else {
+            "○ Truy cập sử dụng: CHƯA CẤP (xem mục 5)"
+        })
 
         val enabled = Prefs.isEnabled(this)
         if (swEnable.isChecked != enabled) {
