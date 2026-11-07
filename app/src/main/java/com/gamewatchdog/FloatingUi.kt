@@ -323,6 +323,7 @@ class FloatingUi(private val svc: WatchdogService) {
         var downT = 0L
         var tracking = false
         v.setOnTouchListener { _, e ->
+            if (replaying) return@setOnTouchListener true // đang phát lại: không ghi
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
@@ -423,44 +424,22 @@ class FloatingUi(private val svc: WatchdogService) {
             )
         )
 
-        // Cho thao tác "xuyên" qua lớp ghi để app vẫn nhận được:
-        // gỡ hẳn lớp ghi NGAY (removeViewImmediate, không chờ), phát lại thao tác với thời gian ngắn,
-        // rồi gắn lại lớp ghi. Không dùng delay cố định nên không bị trễ / rớt chạm.
+        // Giống bản 1.5 nhưng nhanh hơn: khoá ghi, tắt khả năng nhận chạm của lớp ghi,
+        // chờ ngắn (40ms) cho lệnh có hiệu lực rồi phát lại; xong thì bật lại và mở khoá sau 50ms.
         replaying = true
-        val rd = if (swipe) dur.coerceIn(80L, 400L) else dur.coerceIn(50L, 80L)
-        detachLayer()
+        setLayerTouchable(false)
         var restored = false
         val restore = {
             if (!restored) {
                 restored = true
-                attachLayer()
-                replaying = false
+                setLayerTouchable(true)
+                uiHandler.postDelayed({ replaying = false }, 50L)
             }
         }
-        svc.dispatchPx(x1, y1, x2, y2, rd, swipe) { uiHandler.post(restore) }
-        uiHandler.postDelayed(restore, rd + 1500L) // phòng khi hệ thống không gọi lại
-    }
-
-    private fun detachLayer() {
-        val v = layer ?: return
-        try {
-            wm.removeViewImmediate(v)
-        } catch (e: Exception) {
-            // đã bị gỡ
-        }
-    }
-
-    private fun attachLayer() {
-        if (!recording) return
-        val v = layer
-        val lp = layerParams
-        if (v == null || lp == null) return
-        try {
-            wm.addView(v, lp)
-            bringPanelToFront()
-        } catch (e: Exception) {
-            // bỏ qua
-        }
+        uiHandler.postDelayed({
+            svc.dispatchPx(x1, y1, x2, y2, dur, swipe) { uiHandler.post(restore) }
+        }, 40L)
+        uiHandler.postDelayed(restore, dur + 1500L) // phòng khi hệ thống không gọi lại
     }
 
     private fun setLayerTouchable(touchable: Boolean) {
