@@ -424,22 +424,16 @@ class FloatingUi(private val svc: WatchdogService) {
             )
         )
 
-        // Giống bản 1.5 nhưng nhanh hơn: khoá ghi, tắt khả năng nhận chạm của lớp ghi,
-        // chờ ngắn (40ms) cho lệnh có hiệu lực rồi phát lại; xong thì bật lại và mở khoá sau 50ms.
+        // Y hệt bản 1.5: khoá ghi, tắt nhận chạm của lớp ghi, CHỜ 80ms rồi phát lại,
+        // phát lại xong thì bật lại và chờ thêm 150ms trước khi mở khoá ghi.
         replaying = true
         setLayerTouchable(false)
-        var restored = false
-        val restore = {
-            if (!restored) {
-                restored = true
-                setLayerTouchable(true)
-                uiHandler.postDelayed({ replaying = false }, 50L)
-            }
-        }
         uiHandler.postDelayed({
-            svc.dispatchPx(x1, y1, x2, y2, dur, swipe) { uiHandler.post(restore) }
-        }, 40L)
-        uiHandler.postDelayed(restore, dur + 1500L) // phòng khi hệ thống không gọi lại
+            svc.dispatchPx(x1, y1, x2, y2, dur, swipe) {
+                setLayerTouchable(true)
+                uiHandler.postDelayed({ replaying = false }, 150L)
+            }
+        }, 80L)
     }
 
     private fun setLayerTouchable(touchable: Boolean) {
