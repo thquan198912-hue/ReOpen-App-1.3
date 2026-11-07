@@ -323,7 +323,6 @@ class FloatingUi(private val svc: WatchdogService) {
         var downT = 0L
         var tracking = false
         v.setOnTouchListener { _, e ->
-            if (replaying) return@setOnTouchListener true // đang phát lại: không ghi
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = e.rawX
@@ -428,7 +427,7 @@ class FloatingUi(private val svc: WatchdogService) {
         // gỡ hẳn lớp ghi NGAY (removeViewImmediate, không chờ), phát lại thao tác với thời gian ngắn,
         // rồi gắn lại lớp ghi. Không dùng delay cố định nên không bị trễ / rớt chạm.
         replaying = true
-        val rd = if (swipe) dur.coerceAtMost(600L) else dur.coerceAtMost(120L)
+        val rd = if (swipe) dur.coerceIn(80L, 400L) else dur.coerceIn(50L, 80L)
         detachLayer()
         var restored = false
         val restore = {
