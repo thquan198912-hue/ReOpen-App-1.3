@@ -23,6 +23,7 @@
 - `[tên app]` chạm để đổi app đang chọn
 - `⏺` ghi macro cho app đang chọn, `⏹` kết thúc và lưu (ghi mới thay macro cũ của app đó)
 - `▶` chạy macro của app đang chọn ngay trên màn hình hiện tại (đang chạy thì thành `🛑`, bấm để dừng)
+- `✕` thoát giám sát: bấm 2 lần trong 3 giây → tắt giám sát, dừng macro, ẩn thanh nổi (hiện lại bằng nút "Hiện / ẩn nút nổi" trong app)
 
 Khi ghi, thao tác của bạn vẫn được chuyển vào app như bình thường và được lưu cả thời gian chờ giữa các bước.
 
@@ -35,14 +36,18 @@ App nhận ra một app đang hiển thị bằng 3 tín hiệu, chỉ cần m�
 2. app là cửa sổ vừa hiện lên gần nhất (bỏ qua hộp thoại cấp quyền, thanh hệ thống, bàn phím);
 3. hệ thống báo app đang hiển thị — cần cấp quyền **Truy cập sử dụng** cho ReOpen App (mục 5 trong app). **Nên bật khi dùng app nhân bản**, vì game thường có cửa sổ không đọc được.
 
+**Mở lại game (Android 10+)**: hệ thống chặn app nền tự mở app khác. Hãy cấp **Hiển thị trên ứng dụng khác** cho ReOpen App (mục 6 trong app), nếu không lệnh mở lại có thể bị bỏ qua (màn hình vẫn ở launcher).
+
 Mỗi lúc chỉ xử lý một app: mở lại → xác nhận đã thấy → chờ tải → chạy macro, rồi mới tới app khác. Nếu sau 10 giây chưa thấy app, app thử mở lại bằng cách dự phòng (tối đa 3 lần).
 
 ## Chẩn đoán
 Mở game, vào ReOpen App, bấm **Chẩn đoán cửa sổ**: nhật ký sẽ liệt kê các cửa sổ đang có, tín hiệu hệ thống và app nào được nhận ra. Bấm **Sao chép nhật ký** để gửi lại.
 
 ## Chống vòng lặp
-- Mở lại 3 lần liên tiếp mà không nhận ra app trên màn hình → tự tắt giám sát app đó (kèm lý do trong nhật ký).
-- App văng thật liên tục (6 lần trong 5 phút) → tự tắt giám sát app đó.
+- Mở lại 10 lần liên tiếp mà không nhận ra app trên màn hình → tự tắt giám sát app đó (kèm lý do trong nhật ký).
+- App văng thật liên tục (10 lần trong 30 phút) → tự tắt giám sát app đó.
+- Nếu game không mở lên được (đang ở màn hình chính) thì bỏ qua macro, không chạm nhầm vào icon khác.
+- Bộ đếm thời gian dùng đồng hồ đơn điệu nên không lệch khi giờ máy bị chỉnh.
 
 ## Định dạng macro (có thể sửa tay trong nút "Macro")
 ```

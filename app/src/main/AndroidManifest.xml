@@ -8,6 +8,8 @@
         tools:ignore="ProtectedPermissions" />
     <!-- Cần để liệt kê và mở được game đã cài (Android 11+) -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- "Hiển thị trên ứng dụng khác" (người dùng tự cấp): Android 10+ cho phép app có quyền này mở app khác từ nền -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Cho phép xin tắt tối ưu pin để dịch vụ không bị hệ thống dừng -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 

@@ -11,6 +11,8 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
+import android.provider.Settings
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
@@ -40,12 +42,17 @@ class WatchdogService : AccessibilityService() {
             "com.android.permissioncontroller", "com.google.android.permissioncontroller",
             "com.android.packageinstaller", "com.google.android.packageinstaller"
         )
-        private const val LOOP_WINDOW_MS = 5 * 60_000L // khoảng thời gian đếm số lần mở lại
-        private const val LOOP_MAX = 6                  // app văng liên tục quá số lần này trong khoảng trên thì dừng
-        private const val FAIL_MAX = 3                  // mở lại liên tiếp mà không nhận ra app → dừng
+        private const val LOOP_WINDOW_MS = 30 * 60_000L // khoảng thời gian đếm số lần mở lại
+        private const val LOOP_MAX = 10                 // app văng liên tục quá số lần này trong khoảng trên thì dừng
+        private const val FAIL_MAX = 10                 // mở lại liên tiếp mà không nhận ra app → dừng
         private const val RETRY_AFTER_MS = 10_000L      // chưa thấy app sau chừng này thì thử mở lại
         private const val MAX_TRIES = 3                 // số lần mở tối đa cho mỗi lượt
     }
+
+    /** Giờ đơn điệu (không đổi khi đồng hồ hoặc múi giờ của máy bị chỉnh). */
+    private fun nowMs(): Long = SystemClock.elapsedRealtime()
+
+    fun canDrawOverlays(): Boolean = Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this)
 
     private class Launch(val pkg: String, val token: Int, val startedAt: Long) {
         var tries = 1
@@ -98,7 +105,10 @@ class WatchdogService : AccessibilityService() {
         } catch (e: Exception) {
             "?"
         }
-        Prefs.log(this, "Dịch vụ trợ năng đã kết nối (bản $ver)")
+        Prefs.log(this, "Dịch vụ trợ năng đã kết nối (bản $ver, Android API ${Build.VERSION.SDK_INT}, ${Build.MODEL})")
+        if (Build.VERSION.SDK_INT >= 29 && !canDrawOverlays()) {
+            Prefs.log(this, "Lưu ý: chưa cấp \"Hiển thị trên ứng dụng khác\" → Android có thể chặn việc tự mở lại app (xem mục 6 trong app)")
+        }
         handler.removeCallbacksAndMessages(null)
         handler.postDelayed(ticker, 2000L)
 
@@ -179,6 +189,18 @@ class WatchdogService : AccessibilityService() {
 
     fun isBusy(pkg: String): Boolean = pkg in busyApps
 
+    /** Nút ✕ trên thanh nổi: tắt giám sát, dừng mọi macro đang chạy và ẩn thanh nổi. */
+    fun exitWatchdog() {
+        Prefs.setEnabled(this, false)
+        for (pkg in busyApps.toList()) stopMacro(pkg)
+        macroQueue.clear()
+        launching = null
+        awaySince.clear()
+        Prefs.setOverlay(this, false)
+        Prefs.log(this, "Đã thoát giám sát (nút ✕). Mở ReOpen App → \"Hiện / ẩn nút nổi\" để hiện lại thanh nổi.")
+        handler.post { floating?.hide() }
+    }
+
     fun hasUsageAccess(): Boolean = usage?.hasPermission() == true
 
     /** "Thử ngay": mở lại app rồi chạy macro của app đó. Trả về false nếu app đang bận. */
@@ -219,6 +241,10 @@ class WatchdogService : AccessibilityService() {
             this,
             "== Chẩn đoán == trên cùng: $topPkg | quyền \"Truy cập sử dụng\": ${if (on) "BẬT" else "TẮT"} | launcher: $homePkgs"
         )
+        Prefs.log(
+            this,
+            "  Android API ${Build.VERSION.SDK_INT} (${Build.MODEL}) | \"Hiển thị trên ứng dụng khác\": ${if (canDrawOverlays()) "BẬT" else "TẮT"}"
+        )
         if (on) Prefs.log(this, "  hệ thống báo đang hiển thị: ${u?.foregroundPackages()}")
         try {
             val list = windows
@@ -238,7 +264,12 @@ class WatchdogService : AccessibilityService() {
             Prefs.log(this, "  lỗi đọc cửa sổ: ${e.message}")
         }
         for (a in Prefs.getApps(this)) {
-            Prefs.log(this, "  ${a.label} [${a.pkg}]: ${if (isPresent(a.pkg)) "THẤY" else "không thấy"}")
+            val comp = try {
+                buildLaunchIntent(a.pkg, 1)?.component?.flattenToShortString() ?: "(không có)"
+            } catch (e: Exception) {
+                "(lỗi)"
+            }
+            Prefs.log(this, "  ${a.label} [${a.pkg}]: ${if (isPresent(a.pkg)) "THẤY" else "không thấy"} | mở bằng: $comp")
         }
     }
 
@@ -280,6 +311,10 @@ class WatchdogService : AccessibilityService() {
     private fun watch() {
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         val screenOn = pm.isInteractive
+        if (floating?.recording == true) { // đang ghi macro: không đọc cửa sổ để khỏi làm chậm game
+            awaySince.clear()
+            return
+        }
         refreshSignals()
         verifyLaunch()
 
@@ -295,7 +330,7 @@ class WatchdogService : AccessibilityService() {
         val apps = Prefs.getApps(this).filter { it.enabled }
         if (apps.isEmpty()) return
 
-        val now = System.currentTimeMillis()
+        val now = nowMs()
         val grace = Prefs.getGraceSec(this) * 1000L
         val seen = visNow.filter { it !in IGNORED && it != packageName }.joinToString()
         val usageNote = if (usage?.hasPermission() == true) ", hệ thống báo: $usageFgNow" else ""
@@ -329,7 +364,7 @@ class WatchdogService : AccessibilityService() {
             launching = null
             return
         }
-        val now = System.currentTimeMillis()
+        val now = nowMs()
         if (isPresent(l.pkg)) {
             sawPresent.add(l.pkg)
             launching = null
@@ -352,7 +387,7 @@ class WatchdogService : AccessibilityService() {
     }
 
     private fun recover(a: AppConfig, auto: Boolean, reason: String) {
-        val now = System.currentTimeMillis()
+        val now = nowMs()
         if (auto) {
             if ((failCount[a.pkg] ?: 0) >= FAIL_MAX) {
                 failCount.remove(a.pkg)
@@ -368,7 +403,7 @@ class WatchdogService : AccessibilityService() {
             list.removeAll { now - it > LOOP_WINDOW_MS }
             if (list.size >= LOOP_MAX) {
                 list.clear()
-                disableApp(a, "đã mở lại $LOOP_MAX lần trong 5 phút (app văng liên tục?) → tắt giám sát app này")
+                disableApp(a, "đã mở lại $LOOP_MAX lần trong 30 phút (app văng liên tục?) → tắt giám sát app này")
                 return
             }
             list.add(now)
@@ -405,6 +440,16 @@ class WatchdogService : AccessibilityService() {
                 val l = launching
                 if (l != null && l.token == token) {
                     launching = null
+                    if (topPkg in homePkgs) {
+                        // Game không hiện lên, đang ở màn hình chính: chạm theo toạ độ sẽ trúng icon khác → bỏ qua macro
+                        val hint = if (Build.VERSION.SDK_INT >= 29 && !canDrawOverlays()) {
+                            " Android 10+ thường chặn app nền tự mở app khác: hãy cấp \"Hiển thị trên ứng dụng khác\" (mục 6 trong app)."
+                        } else {
+                            ""
+                        }
+                        settleRun(a.pkg, "không mở được app lên màn hình sau ${a.startupSec}s → bỏ qua macro.$hint")
+                        return@postDelayed
+                    }
                     Prefs.log(this, "${a.label}: chưa nhận ra app trên màn hình sau ${a.startupSec}s, vẫn chạy macro")
                 }
                 enqueueMacro(a.pkg, token)
@@ -509,7 +554,8 @@ class WatchdogService : AccessibilityService() {
         }, s.delayMs)
     }
 
-    private fun finishRun(pkg: String, msg: String) {
+    /** Kết thúc lượt chạy của app (ghi nhật ký, tính lỗi, giải phóng). Không đụng tới hàng đợi macro. */
+    private fun settleRun(pkg: String, msg: String) {
         Prefs.log(this, "${appLabel(pkg)}: $msg")
         if (autoRuns.remove(pkg)) {
             if (pkg in sawPresent) {
@@ -523,9 +569,13 @@ class WatchdogService : AccessibilityService() {
         busyApps.remove(pkg)
         tokens.remove(pkg)
         if (launching?.pkg == pkg) launching = null
-        // Sau khi macro xong, cho app thêm thời gian ổn định và tính lại thời gian vắng mặt của mọi app
-        cooldownUntil[pkg] = maxOf(cooldownUntil[pkg] ?: 0L, System.currentTimeMillis() + 20000L)
+        // Cho app thêm thời gian ổn định và tính lại thời gian vắng mặt của mọi app
+        cooldownUntil[pkg] = maxOf(cooldownUntil[pkg] ?: 0L, nowMs() + 20000L)
         awaySince.clear()
+    }
+
+    private fun finishRun(pkg: String, msg: String) {
+        settleRun(pkg, msg)
         macroRunning = false
         pump()
     }

@@ -27,6 +27,7 @@ import kotlin.math.hypot
  *  [tên]  chạm để đổi app đang chọn (macro ghi / chạy sẽ thuộc app này)
  *  ⏺/⏹   bắt đầu / kết thúc ghi macro cho app đang chọn
  *  ▶      chạy macro của app đang chọn ngay trên màn hình hiện tại
+ *  ✕      thoát giám sát (tắt giám sát, dừng macro, ẩn thanh nổi)
  */
 @SuppressLint("ClickableViewAccessibility")
 class FloatingUi(private val svc: WatchdogService) {
@@ -40,6 +41,8 @@ class FloatingUi(private val svc: WatchdogService) {
     private var chipTv: TextView? = null
     private var recTv: TextView? = null
     private var playTv: TextView? = null
+    private var exitTv: TextView? = null
+    private var exitArmedAt = 0L
     private var collapsed = false
 
     private var layer: View? = null
@@ -87,6 +90,19 @@ class FloatingUi(private val svc: WatchdogService) {
         tv.background = bg
         tv.setOnClickListener { onClick() }
         return tv
+    }
+
+    /** Bấm ✕ lần 1: hỏi lại bằng thông báo; bấm lần 2 trong 3 giây: thoát giám sát. */
+    private fun confirmExit() {
+        val now = SystemClock.uptimeMillis()
+        if (now - exitArmedAt < 3000L) {
+            exitArmedAt = 0L
+            if (recording) stopRecording()
+            svc.exitWatchdog()
+        } else {
+            exitArmedAt = now
+            toast("Bấm ✕ lần nữa để thoát giám sát")
+        }
     }
 
     // ---- App đang chọn ----
@@ -152,7 +168,10 @@ class FloatingUi(private val svc: WatchdogService) {
         r.addView(watch)
         r.addView(chipView)
         r.addView(rec)
+        val exit = item("✕") { confirmExit() }
+        exit.setTextColor(Color.rgb(255, 120, 120))
         r.addView(play)
+        r.addView(exit)
 
         val p = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -181,6 +200,7 @@ class FloatingUi(private val svc: WatchdogService) {
         chipTv = chipView
         recTv = rec
         playTv = play
+        exitTv = exit
         collapsed = false
         refresh()
     }
@@ -214,6 +234,7 @@ class FloatingUi(private val svc: WatchdogService) {
         chipTv?.visibility = vis
         recTv?.visibility = vis
         playTv?.visibility = vis
+        exitTv?.visibility = vis
         handleTv?.text = if (collapsed) "●" else "≡"
         val r = root
         val p = rootParams
@@ -404,17 +425,43 @@ class FloatingUi(private val svc: WatchdogService) {
         )
 
         // Cho thao tác "xuyên" qua lớp ghi để app vẫn nhận được:
-        // 1) khoá ghi (replaying), 2) tắt khả năng nhận chạm của lớp ghi,
-        // 3) CHỜ lớp ghi tắt hẳn rồi mới phát lại (tránh cú chạm phát lại rơi vào lớp ghi và bị ghi trùng),
-        // 4) phát lại xong thì bật lại, và chờ thêm một nhịp trước khi mở khoá ghi.
+        // gỡ hẳn lớp ghi NGAY (removeViewImmediate, không chờ), phát lại thao tác với thời gian ngắn,
+        // rồi gắn lại lớp ghi. Không dùng delay cố định nên không bị trễ / rớt chạm.
         replaying = true
-        setLayerTouchable(false)
-        uiHandler.postDelayed({
-            svc.dispatchPx(x1, y1, x2, y2, dur, swipe) {
-                setLayerTouchable(true)
-                uiHandler.postDelayed({ replaying = false }, 150L)
+        val rd = if (swipe) dur.coerceAtMost(600L) else dur.coerceAtMost(120L)
+        detachLayer()
+        var restored = false
+        val restore = {
+            if (!restored) {
+                restored = true
+                attachLayer()
+                replaying = false
             }
-        }, 80L)
+        }
+        svc.dispatchPx(x1, y1, x2, y2, rd, swipe) { uiHandler.post(restore) }
+        uiHandler.postDelayed(restore, rd + 1500L) // phòng khi hệ thống không gọi lại
+    }
+
+    private fun detachLayer() {
+        val v = layer ?: return
+        try {
+            wm.removeViewImmediate(v)
+        } catch (e: Exception) {
+            // đã bị gỡ
+        }
+    }
+
+    private fun attachLayer() {
+        if (!recording) return
+        val v = layer
+        val lp = layerParams
+        if (v == null || lp == null) return
+        try {
+            wm.addView(v, lp)
+            bringPanelToFront()
+        } catch (e: Exception) {
+            // bỏ qua
+        }
     }
 
     private fun setLayerTouchable(touchable: Boolean) {

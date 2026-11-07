@@ -107,7 +107,8 @@ class MainActivity : Activity() {
                     "🟢/⚪ bật / tắt giám sát\n" +
                     "[tên app] chạm để đổi app đang chọn\n" +
                     "⏺ ghi macro cho app đang chọn, ⏹ kết thúc và lưu\n" +
-                    "▶ chạy macro của app đang chọn ngay trên màn hình",
+                    "▶ chạy macro của app đang chọn ngay trên màn hình\n" +
+                    "✕ thoát giám sát (bấm 2 lần): tắt giám sát và ẩn thanh nổi",
                 13f, false
             )
         )
@@ -157,6 +158,23 @@ class MainActivity : Activity() {
                 toast("Máy không mở được màn hình này, hãy tìm trong Cài đặt → Quyền riêng tư / Quyền truy cập đặc biệt")
             }
         })
+        root.addView(label("6. Cho phép tự mở lại app (quan trọng)", 16f, true))
+        root.addView(
+            label(
+                "Android 10+ chặn app chạy nền tự mở app khác (lệnh mở bị bỏ qua, game không hiện lên). " +
+                    "Cấp \"Hiển thị trên ứng dụng khác\" cho ReOpen App để được phép mở lại game từ nền.",
+                13f, false
+            )
+        )
+        root.addView(button("Cấp \"Hiển thị trên ứng dụng khác\"") {
+            try {
+                startActivity(
+                    Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                )
+            } catch (e: Exception) {
+                toast("Máy không mở được màn hình này, hãy tìm trong Cài đặt → Ứng dụng → ReOpen App → Hiển thị trên ứng dụng khác")
+            }
+        })
         root.addView(button("Chẩn đoán cửa sổ (mở game rồi bấm)") {
             val s = WatchdogService.instance
             if (s == null) {
@@ -201,6 +219,7 @@ class MainActivity : Activity() {
     private fun refreshStatus() {
         val on = WatchdogService.instance != null
         val usageOk = UsageTracker(this).hasPermission()
+        val overlayOk = android.os.Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this)
         tvStatus.text = (if (on) {
             "● Dịch vụ trợ năng: ĐANG CHẠY"
         } else {
@@ -209,6 +228,10 @@ class MainActivity : Activity() {
             "● Truy cập sử dụng: ĐÃ CẤP (nhận diện app nhân bản tốt hơn)"
         } else {
             "○ Truy cập sử dụng: CHƯA CẤP (xem mục 5)"
+        }) + "\n" + (if (overlayOk) {
+            "● Hiển thị trên ứng dụng khác: ĐÃ CẤP (được phép mở lại app từ nền)"
+        } else {
+            "○ Hiển thị trên ứng dụng khác: CHƯA CẤP (xem mục 6, cần để mở lại game)"
         })
 
         val enabled = Prefs.isEnabled(this)

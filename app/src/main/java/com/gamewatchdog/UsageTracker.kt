@@ -37,6 +37,7 @@ class UsageTracker(private val ctx: Context) {
         try {
             val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
             val now = System.currentTimeMillis()
+            if (now < lastQuery) lastQuery = 0L // đồng hồ máy bị chỉnh lùi
             val from = if (lastQuery == 0L) now - 6 * 3600_000L else lastQuery - 2000L
             val events = usm.queryEvents(from, now)
             val e = UsageEvents.Event()
